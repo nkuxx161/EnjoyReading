@@ -32,6 +32,9 @@
 
     <TextView
         android:id="@+id/item_book_title"
+        android:maxWidth="200dp"
+        android:ellipsize="end"
+        android:singleLine="true"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
@@ -45,6 +48,9 @@
 
     <TextView
         android:id="@+id/item_book_author"
+        android:maxWidth="200dp"
+        android:ellipsize="end"
+        android:singleLine="true"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"

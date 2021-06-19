@@ -160,9 +160,9 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
 //                0, 80, (float)4.0));
         //对返回的json数据解析，构建book对象
         try {
-            String id, title, description, author, imgUrl;
-            int pages;
-            float rating;
+            String id = "", title = "", description= "", author = "", imgUrl = "";
+            int pages = 0;
+            float rating = 0;
             JSONObject jsonData = new JSONObject(jsonString);
             JSONObject data = jsonData.getJSONObject("data");
             JSONArray bookArray = data.getJSONArray("subject");
@@ -170,16 +170,25 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
                 JSONObject book = bookArray.getJSONObject(i);
                 title = book.getString("title");
                 description = "暂无描述";
-                author = book.getJSONArray("abstract").get(0).toString();
+                try {
+                    author = book.getJSONArray("abstract").get(0).toString();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    author = book.getString("gray");
+                }
                 imgUrl = book.getString("img");
                 pages = 0;//暂时获取不到
                 id = book.getString("id");
-                rating = parseFloat(book.getString("score"));
+                try {
+                    rating = parseFloat(book.getString("score"));
+                } catch (Exception e) {
+                    rating = 8;
+                }
                 mdata.add(new Book(title, description, author, imgUrl, pages, id, rating/2));
             }
         } catch (JSONException e) {
             Looper.prepare();
-            Toast.makeText(MainActivity.this, "获取豆瓣热门图书失败", Toast.LENGTH_SHORT).show();
+            Toast.makeText(MainActivity.this, "获取豆瓣图书失败", Toast.LENGTH_SHORT).show();
             Looper.loop();
         }
     }
@@ -200,14 +209,14 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
         btnAddBook.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                addBook();
+                topBook();
             }
         });
 
         btnRemove.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                removeBook();
+                newestBook();
             }
         });
 
@@ -215,21 +224,30 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
 
     }
 
-    private void removeBook() {
-
-        mdata.remove(1);
-        bookAdapter.notifyItemRemoved(1);
-
-    }
-
-    private void addBook() {
-
-        Book book = new Book(R.drawable.nondesigner);
-        mdata.add(1,book);
-        bookAdapter.notifyItemInserted(1);
+    private void topBook() {
+        getURLResource("http://39.105.38.10:8081/book/newBook");
+        //主线程等待子线程1s获取资源
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        setupBookAdapter();
 
     }
 
+    private void newestBook() {
+        getURLResource("http://39.105.38.10:8081/book/top250");
+        //主线程等待子线程1s获取资源
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        setupBookAdapter();
+    }
+
+    //跳转详情界面
     @Override
     public void onBookItemClick(int pos,
                                 ImageView imgContainer,
@@ -268,7 +286,5 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
         }
         else
             startActivity(intent);
-
-
     }
 }
