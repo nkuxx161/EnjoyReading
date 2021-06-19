@@ -1,6 +1,7 @@
 package com.awslab.bookuitemplate.recyclerview;
 
 import android.media.Image;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -51,6 +52,7 @@ public class BookAdapter extends RecyclerView.Adapter<BookAdapter.bookviewholder
                 .load(mdata.get(position).getImgUrl()) // set the img book Url
                 .transforms(new CenterCrop(),new RoundedCorners(16)) // i know it's deprecated i will fix it later
                 .into(holder.imgBook); // destination path
+        Log.d("Glide加载网络图片", "yes");
 
         holder.ratingBar.setRating(mdata.get(position).getRating()); //设置评分星星
         holder.rate.setText(mdata.get(position).getRating() + "");//设置评分数字
@@ -60,7 +62,7 @@ public class BookAdapter extends RecyclerView.Adapter<BookAdapter.bookviewholder
         if (pages != 0) {
             holder.pages.setText(pages +" Pages");
         } else {
-            holder.pages.setText("No pages info");
+            holder.pages.setText("More info");
         }
 
 

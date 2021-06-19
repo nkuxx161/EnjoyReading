@@ -8,22 +8,38 @@ import androidx.recyclerview.widget.RecyclerView;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Looper;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.RatingBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.awslab.bookuitemplate.model.Book;
 import com.awslab.bookuitemplate.recyclerview.BookAdapter;
 import com.awslab.bookuitemplate.recyclerview.BookCallback;
 import com.awslab.bookuitemplate.recyclerview.CustomItemAnimator;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
 // make sure to import this exact same class
 import androidx.core.util.Pair;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import static java.lang.Float.parseFloat;
+import static java.lang.Integer.parseInt;
 
 public class MainActivity extends AppCompatActivity implements BookCallback {
 
@@ -39,9 +55,14 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
         setContentView(R.layout.activity_main);
         getSupportActionBar().hide();
         initViews();
-        initmdataBooks();
+        getURLResource("http://39.105.38.10:8081/book/top250");
+        //主线程等待子线程1s获取资源
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         setupBookAdapter();
-
     }
 
     private void setupBookAdapter() {
@@ -51,27 +72,116 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
 
     }
 
-    private void initmdataBooks() {
+    public void getURLResource(final String ulrDest) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                HttpURLConnection urlConnection = null;
+                BufferedReader reader = null;
+                String bookJSONString = null;
+
+                try {
+                    // Build the full query URI, limiting results to 10 items and
+                    // printed books.
+                    // Convert the URI to a URL.
+                    URL requestURL = new URL(ulrDest);
+
+                    // Open the network connection.
+                    urlConnection = (HttpURLConnection) requestURL.openConnection();
+                    urlConnection.setRequestMethod("GET");
+                    urlConnection.setConnectTimeout(8000);
+                    urlConnection.setReadTimeout(10000);
+//                    urlConnection.connect();
+
+                    // Get the InputStream.
+                    InputStream inputStream = urlConnection.getInputStream();
+
+                    // Create a buffered reader from that input stream.
+                    reader = new BufferedReader(new InputStreamReader(inputStream));
+
+                    // Use a StringBuilder to hold the incoming response.
+                    StringBuilder builder = new StringBuilder();
+
+                    if (urlConnection.getResponseCode() != 200) {
+                        initmdataBooks("");//处理得到的数据
+                        return;
+                    }
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        // Add the current line to the string.
+                        builder.append(line);
+
+                        // Since this is JSON, adding a newline isn't necessary (it won't
+                        // affect parsing) but it does make debugging a *lot* easier
+                        // if you print out the completed buffer for debugging.
+                        builder.append("\n");
+                    }
+
+                    if (builder.length() == 0) {
+                        // Stream was empty.  Exit without parsing.
+                        initmdataBooks("");//处理得到的数据
+                        return;
+                    }
+
+                    bookJSONString = builder.toString();
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } finally {
+                    // Close the connection and the buffered reader.
+                    if (urlConnection != null) {
+                        urlConnection.disconnect();
+                    }
+                    if (reader != null) {
+                        try {
+                            reader.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+
+                // Write the final JSON response to the log
+                Log.d("请求得到的json数据", bookJSONString);
+
+                initmdataBooks(bookJSONString);//处理得到的数据
+            }
+        }).start();
+    }
+
+    private void initmdataBooks(String jsonString) {
 
         // for testing purpos I'm creating a random set of books
         // you may get your data from web service or firebase database.
 
         mdata = new ArrayList<>();
-//        mdata.add(new Book(R.drawable.book1));
-//        mdata.add(new Book(R.drawable.gatsby));
-//        mdata.add(new Book(R.drawable.gatsby2));
-//        mdata.add(new Book(R.drawable.nondesigner));
-//        mdata.add(new Book(R.drawable.thefault));
-//        mdata.add(new Book(R.drawable.themessy));
-        mdata.add(new Book("我的心中每天开出一朵花", "暂无描述", "幾米",
-                "https://img9.doubanio.com/view/subject/l/public/s1150266.jpg",
-                0, 80, (float)4.0));
-        mdata.add(new Book("我的心中每天开出一朵花", "暂无描述", "幾米",
-                "https://img9.doubanio.com/view/subject/l/public/s1150266.jpg",
-                250, 80, (float)3.0));
-
-
-
+//        mdata.add(new Book("我的心中每天开出一朵花", "暂无描述", "幾米",
+//                "https://img9.doubanio.com/view/subject/l/public/s1150266.jpg",
+//                0, 80, (float)4.0));
+        //对返回的json数据解析，构建book对象
+        try {
+            String id, title, description, author, imgUrl;
+            int pages;
+            float rating;
+            JSONObject jsonData = new JSONObject(jsonString);
+            JSONObject data = jsonData.getJSONObject("data");
+            JSONArray bookArray = data.getJSONArray("subject");
+            for (int i = 0; i < bookArray.length(); i++) {
+                JSONObject book = bookArray.getJSONObject(i);
+                title = book.getString("title");
+                description = "暂无描述";
+                author = book.getJSONArray("abstract").get(0).toString();
+                imgUrl = book.getString("img");
+                pages = 0;//暂时获取不到
+                id = book.getString("id");
+                rating = parseFloat(book.getString("score"));
+                mdata.add(new Book(title, description, author, imgUrl, pages, id, rating/2));
+            }
+        } catch (JSONException e) {
+            Looper.prepare();
+            Toast.makeText(MainActivity.this, "获取豆瓣热门图书失败", Toast.LENGTH_SHORT).show();
+            Looper.loop();
+        }
     }
 
     private void initViews() {
