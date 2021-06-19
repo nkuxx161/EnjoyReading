@@ -1,5 +1,6 @@
 package com.awslab.bookuitemplate;
 
+import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityOptionsCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -42,7 +43,7 @@ import static java.lang.Float.parseFloat;
 import static java.lang.Integer.parseInt;
 
 public class MainActivity extends AppCompatActivity implements BookCallback {
-
+    ActionBar actionBar;
     private RecyclerView rvBooks;
     private BookAdapter bookAdapter;
     private List<Book> mdata ;
@@ -53,7 +54,7 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        getSupportActionBar().hide();
+        actionBar = getSupportActionBar();
         initViews();
         getURLResource("http://39.105.38.10:8081/book/top250");
         //主线程等待子线程1s获取资源
@@ -65,6 +66,7 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
         setupBookAdapter();
     }
 
+    //将获取的书籍信息更新到屏幕
     private void setupBookAdapter() {
 
         bookAdapter = new BookAdapter(mdata,this);
@@ -72,6 +74,7 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
 
     }
 
+    //从api获取书籍信息
     public void getURLResource(final String ulrDest) {
         new Thread(new Runnable() {
             @Override
@@ -219,8 +222,6 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
                 newestBook();
             }
         });
-
-
 
     }
 
