@@ -171,9 +171,29 @@ public class BookDetailsActivity extends AppCompatActivity {
     }
 
     private void loadBookData(Book item) {
+        //TODO 当是收藏数据时，直接加载
+        if (item.getIsFav() == "yes") {
+            return;
+        }
 
-        // bind book data here for now i will only load the book cover image
         String id = item.getReview();
+        try {
+            parseInt(id);
+        } catch(NumberFormatException e) {
+            //如果是google搜索的api
+            Glide.with(this).load(item.getImgUrl()).into(imgbook);
+            title.setText(item.getTitle());
+            author.setText(item.getAuthor());
+            ratingBar.setRating(item.getRating());
+            if (item.getPages() == 0) {
+                pages.setText("No pages info");
+            } else {
+                pages.setText(item.getPages()+" pages");
+            }
+            score.setText(item.getRating()+"");
+            description.setText("简介：\n  " + item.getDescription());
+            return;
+        }
         getPagesAndDesc("http://39.105.38.10:8081/book/info?id="+id, item);
         Glide.with(this).load(item.getImgUrl()).into(imgbook);
         title.setText(item.getTitle());

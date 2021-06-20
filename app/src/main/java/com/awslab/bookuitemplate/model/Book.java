@@ -5,7 +5,7 @@ import java.io.Serializable;
 // implement Serializable interface is important to send the book object to another activity
 public class Book implements Serializable {
 
-    private String title,description,author,imgUrl, review;
+    private String title,description,author,imgUrl, review,isFav;
     private int pages;
     private float rating;
     private int drawableResource; // this for testing purpos...
@@ -25,9 +25,18 @@ public class Book implements Serializable {
         this.pages = pages;
         this.review = review;
         this.rating = rating;
-        this.drawableResource = 0;
+        this.drawableResource = 0; //测试用
+        this.isFav = "no";
     }
 
+
+    public String getIsFav() {
+        return isFav;
+    }
+
+    public void setIsFav(String title) {
+        this.isFav = isFav;
+    }
 
     public String getTitle() {
         return title;
