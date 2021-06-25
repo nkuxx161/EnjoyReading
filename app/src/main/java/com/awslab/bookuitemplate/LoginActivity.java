@@ -52,8 +52,8 @@ public class LoginActivity extends AppCompatActivity {
                                 //如果需要跳转可在这里进行跳转页面
                                 //登录成功跳转到软件首页页面
                                 //用sharedPreferences保存登录状态
-                                SharedPreferences preferences=getSharedPreferences("user", Context.MODE_PRIVATE);
-                                SharedPreferences.Editor editor=preferences.edit();
+                                SharedPreferences preferences = getSharedPreferences("user", Context.MODE_PRIVATE);
+                                SharedPreferences.Editor editor = preferences.edit();
                                 editor.putString("userPhone", editTextPhoneNum.getText().toString());//username为用户登录的用户名
                                 editor.commit();
 

@@ -100,14 +100,15 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
         itemUser.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
             @Override
             public boolean onMenuItemClick(MenuItem menuItem) {
-                Toast.makeText(MainActivity.this, "user", Toast.LENGTH_SHORT).show();
-
                 SharedPreferences preferences = getSharedPreferences("user", Context.MODE_PRIVATE);
                 String name = preferences.getString("userPhone",null);
+
                 if (name != null) {
+                    Toast.makeText(MainActivity.this, "user", Toast.LENGTH_SHORT).show();
                     Intent intent=new Intent(MainActivity.this, AdminManageActivity.class);
                     startActivity(intent);
                 } else {
+                    Toast.makeText(MainActivity.this, "请先登录", Toast.LENGTH_SHORT).show();
                     Intent intent=new Intent(MainActivity.this, LoginActivity.class);
                     startActivity(intent);
                 }
@@ -119,7 +120,20 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
         itemFav.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
             @Override
             public boolean onMenuItemClick(MenuItem menuItem) {
-                Toast.makeText(MainActivity.this, "fav", Toast.LENGTH_SHORT).show();
+                SharedPreferences preferences = getSharedPreferences("user", Context.MODE_PRIVATE);
+                String name = preferences.getString("userPhone",null);
+
+                if (name != null) {
+                    Toast.makeText(MainActivity.this, "fav", Toast.LENGTH_SHORT).show();
+                    Intent intent = new Intent(MainActivity.this, AdminFavlistActivity.class);
+                    startActivity(intent);
+                } else {
+                    Toast.makeText(MainActivity.this, "请先登录", Toast.LENGTH_SHORT).show();
+                    Intent intent = new Intent(MainActivity.this, LoginActivity.class);
+                    startActivity(intent);
+                }
+
+
                 return true;
             }
 
@@ -506,4 +520,5 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
         else
             startActivity(intent);
     }
+
 }
