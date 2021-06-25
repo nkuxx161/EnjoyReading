@@ -1,4 +1,11 @@
 <resources>
     <string name="app_name">享阅</string>
     <string name="lorem_text">暂无描述</string>
+
+    <string name="landing">登     录</string>
+    <string name="validateNum">获取验证码</string>
+    <string name="validate">验证码</string>
+    <string name="tel">请输入手机号码</string>
+    <string name="exit_login">退出登录</string>
+    <string name="connect">github联系</string>
 </resources>

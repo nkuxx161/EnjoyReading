@@ -6,7 +6,9 @@ import androidx.core.app.ActivityOptionsCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Looper;
@@ -75,6 +77,8 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
             e.printStackTrace();
         }
         setupBookAdapter();
+
+        SharedPreferences preferences=getSharedPreferences("user", Context.MODE_PRIVATE);
     }
 
     //解析菜单资源文件
@@ -97,6 +101,16 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
             @Override
             public boolean onMenuItemClick(MenuItem menuItem) {
                 Toast.makeText(MainActivity.this, "user", Toast.LENGTH_SHORT).show();
+
+                SharedPreferences preferences = getSharedPreferences("user", Context.MODE_PRIVATE);
+                String name = preferences.getString("userPhone",null);
+                if (name != null) {
+                    Intent intent=new Intent(MainActivity.this, AdminManageActivity.class);
+                    startActivity(intent);
+                } else {
+                    Intent intent=new Intent(MainActivity.this, LoginActivity.class);
+                    startActivity(intent);
+                }
                 return true;
             }
 
