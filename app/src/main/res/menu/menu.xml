@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
         android:id="@+id/app_bar_fav"
-        android:icon="@drawable/ic_favorite_black_24dp"
+        android:icon="@drawable/ic_menu_fav_24dp"
         android:title="Fav"
         app:showAsAction="always" />
 

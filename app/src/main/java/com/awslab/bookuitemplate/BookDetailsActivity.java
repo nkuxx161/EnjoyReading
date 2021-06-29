@@ -1,16 +1,26 @@
 package com.awslab.bookuitemplate;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.loader.app.LoaderManager;
+import androidx.loader.content.Loader;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.StrictMode;
 import android.util.Log;
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.RatingBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.awslab.bookuitemplate.NetworkUtils.BookLoader;
 import com.awslab.bookuitemplate.model.Book;
 import com.bumptech.glide.Glide;
 
@@ -25,9 +35,18 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import static com.awslab.bookuitemplate.AdminFavlistActivity.LOG_TAG;
+import static com.awslab.bookuitemplate.R.drawable.ic_favorite_black_24dp;
+import static com.awslab.bookuitemplate.R.drawable.ic_favorite_red_24dp;
 import static java.lang.Integer.parseInt;
 
-public class BookDetailsActivity extends AppCompatActivity {
+public class BookDetailsActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<String> {
+    public static final String LOG_TAG = "BookDetailsActivity";
+
+    Book item;
+    private String phone;
+    private String serverUrl = "https://hello-cloudbase-3gcqukj9c27892d6-1305327820.ap-shanghai.service.tcloudbase.com/api/v1.0/book-collection"; //服务器收藏集合地址
+    public JSONObject requestBody; //消息体
 
     ImageView imgbook;
     TextView title;
@@ -48,6 +67,9 @@ public class BookDetailsActivity extends AppCompatActivity {
             StrictMode.setThreadPolicy(policy);
         }
 
+        SharedPreferences preferences = getSharedPreferences("user", Context.MODE_PRIVATE);
+        phone = preferences.getString("userPhone",null);
+
         //ini view
         imgbook = findViewById(R.id.item_book_img);
         title = findViewById(R.id.item_book_title);
@@ -60,13 +82,15 @@ public class BookDetailsActivity extends AppCompatActivity {
 
 
         // we need to get book item object
-
-        Book item = (Book) getIntent().getExtras().getSerializable("bookObject");
-
+        item = (Book) getIntent().getExtras().getSerializable("bookObject");
         loadBookData(item);
 
-
+        if (LoaderManager.getInstance(this).getLoader(0) != null) {
+            LoaderManager.getInstance(this).initLoader(0, null, this);
+        }
     }
+
+    //从豆瓣服务器得到书籍的具体描述
     public void getPagesAndDesc(String ulrDest, Book item) {
         // Set up variables for the try block that need to be closed in the
         // finally block.
@@ -170,9 +194,22 @@ public class BookDetailsActivity extends AppCompatActivity {
         return;
     }
 
+    //渲染数据到页面
     private void loadBookData(Book item) {
-        //TODO 当是收藏数据时，直接加载
-        if (item.getIsFav() == "yes") {
+        //当是收藏数据时，直接加载
+        if (item.getIsFav().equals("yes")) {
+            Glide.with(this).load(item.getImgUrl()).into(imgbook);
+            title.setText(item.getTitle());
+            author.setText(item.getAuthor());
+            ratingBar.setRating(item.getRating());
+            if (item.getPages() == 0) {
+                pages.setText("No pages info");
+            } else {
+                pages.setText(item.getPages()+" pages");
+            }
+            score.setText(item.getRating()+"");
+            description.setText("简介：\n  " + item.getDescription());
+            fav.setImageResource(ic_favorite_red_24dp); //收藏的话是红色的心
             return;
         }
 
@@ -194,6 +231,7 @@ public class BookDetailsActivity extends AppCompatActivity {
             description.setText("简介：\n  " + item.getDescription());
             return;
         }
+        //如果是豆瓣qpi的数据
         getPagesAndDesc("http://39.105.38.10:8081/book/info?id="+id, item);
         Glide.with(this).load(item.getImgUrl()).into(imgbook);
         title.setText(item.getTitle());
@@ -206,7 +244,91 @@ public class BookDetailsActivity extends AppCompatActivity {
         }
         score.setText(item.getRating()+"");
         description.setText(item.getDescription());
+    }
 
+    //点击爱心图标
+    public void addCollection(View view) {
+//        Toast.makeText(this, "点击了爱心", Toast.LENGTH_SHORT).show();
+        if (item.getIsFav().equals("no")) {
+            item.setIsFav("yes");
+//            Toast.makeText(this, "收藏成功", Toast.LENGTH_SHORT).show();
+        } else if (item.getIsFav().equals("yes")) {
+            item.setIsFav("no");
+//            Toast.makeText(this, "取消收藏成功", Toast.LENGTH_SHORT).show();
+        }
+        //检查网络状态
+        ConnectivityManager connMgr = (ConnectivityManager)
+                getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = null;
+        if (connMgr != null) {
+            networkInfo = connMgr.getActiveNetworkInfo();
+        }
+        //如果有网络连接执行异步任务
+        if (networkInfo != null) {
+            LoaderManager.getInstance(this).restartLoader(0, null, this);
+        }
+    }
+
+    @NonNull
+    @Override
+    public Loader<String> onCreateLoader(int id, @Nullable Bundle args) {
+        if (item.getIsFav() == "no") { //取消收藏
+            requestBody = new JSONObject();
+            JSONObject query = new JSONObject();
+            try {
+                query.put("phone", phone);
+                query.put("bookId", item.getReview());//要取消收藏的书的id
+                requestBody.put("query", query);
+                Log.d(LOG_TAG, String.valueOf(requestBody));
+            } catch (JSONException e) {
+                e.printStackTrace();
+                Log.d(LOG_TAG, "构建请求体失败");
+            }
+            return new BookLoader(this, "DELETE", serverUrl+"/", requestBody);
+        } else { //收藏
+            JSONArray data = new JSONArray();
+            JSONObject bookItem = new JSONObject();
+            try {
+                bookItem.put("phone", phone);
+                bookItem.put("bookId", item.getReview());//要收藏的书的id
+                bookItem.put("bookImg", item.getImgUrl());
+                bookItem.put("bookName", item.getTitle());
+                bookItem.put("bookAuthor", item.getAuthor());
+                bookItem.put("description", item.getDescription());
+                bookItem.put("bookReview", item.getRating()+"");
+                bookItem.put("bookPages", item.getPages()+"");
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            data.put(bookItem);
+            try {
+                requestBody = new JSONObject();
+                requestBody.put("data", data);
+                Log.d(LOG_TAG, String.valueOf(requestBody));
+            } catch (JSONException e) {
+                e.printStackTrace();
+                Log.d(LOG_TAG, "构建请求体失败");
+            }
+            return new BookLoader(this, "POST", serverUrl, requestBody);
+        }
+    }
+
+    @Override
+    public void onLoadFinished(@NonNull Loader<String> loader, String data) {
+        if (data != null) {
+            Log.d(LOG_TAG, data);
+        }
+        if (item.getIsFav() == "no") {
+            Toast.makeText(this, "取消收藏成功", Toast.LENGTH_SHORT).show();
+            fav.setImageResource(ic_favorite_black_24dp);
+        } else if (item.getIsFav() == "yes") {
+            Toast.makeText(this, "收藏成功", Toast.LENGTH_SHORT).show();
+            fav.setImageResource(ic_favorite_red_24dp);
+        }
+    }
+
+    @Override
+    public void onLoaderReset(@NonNull Loader<String> loader) {
 
     }
 }

@@ -1,14 +1,20 @@
 package com.awslab.bookuitemplate;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityOptionsCompat;
+import androidx.loader.app.LoaderManager;
+import androidx.loader.content.Loader;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Looper;
@@ -23,6 +29,7 @@ import android.widget.RatingBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.awslab.bookuitemplate.NetworkUtils.BookLoader;
 import com.awslab.bookuitemplate.model.Book;
 import com.awslab.bookuitemplate.recyclerview.BookAdapter;
 import com.awslab.bookuitemplate.recyclerview.BookCallback;
@@ -50,7 +57,7 @@ import org.json.JSONObject;
 import static java.lang.Float.parseFloat;
 import static java.lang.Integer.parseInt;
 
-public class MainActivity extends AppCompatActivity implements BookCallback {
+public class MainActivity extends AppCompatActivity implements BookCallback, LoaderManager.LoaderCallbacks<String> {
     ActionBar actionBar;
     SearchFragment searchFragment;
     private RecyclerView rvBooks;
@@ -78,7 +85,9 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
         }
         setupBookAdapter();
 
-        SharedPreferences preferences=getSharedPreferences("user", Context.MODE_PRIVATE);
+        if (LoaderManager.getInstance(this).getLoader(0) != null) {
+            LoaderManager.getInstance(this).initLoader(0, null, this);
+        }
     }
 
     //解析菜单资源文件
@@ -104,7 +113,7 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
                 String name = preferences.getString("userPhone",null);
 
                 if (name != null) {
-                    Toast.makeText(MainActivity.this, "user", Toast.LENGTH_SHORT).show();
+//                    Toast.makeText(MainActivity.this, "user", Toast.LENGTH_SHORT).show();
                     Intent intent=new Intent(MainActivity.this, AdminManageActivity.class);
                     startActivity(intent);
                 } else {
@@ -124,7 +133,7 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
                 String name = preferences.getString("userPhone",null);
 
                 if (name != null) {
-                    Toast.makeText(MainActivity.this, "fav", Toast.LENGTH_SHORT).show();
+//                    Toast.makeText(MainActivity.this, "fav", Toast.LENGTH_SHORT).show();
                     Intent intent = new Intent(MainActivity.this, AdminFavlistActivity.class);
                     startActivity(intent);
                 } else {
@@ -143,92 +152,29 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
 
 
     //从谷歌api搜索数据
-    public void getURLResourceFromGoogle(final String ulrDest) {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                HttpURLConnection urlConnection = null;
-                BufferedReader reader = null;
-                String bookJSONString = null;
-
-                try {
-                    // Build the full query URI, limiting results to 10 items and
-                    // printed books.
-                    // Convert the URI to a URL.
-                    URL requestURL = new URL(ulrDest);
-
-                    // Open the network connection.
-                    urlConnection = (HttpURLConnection) requestURL.openConnection();
-                    urlConnection.setRequestMethod("GET");
-                    urlConnection.setConnectTimeout(80000);
-                    urlConnection.setReadTimeout(10000);
-//                    urlConnection.connect();
-
-                    // Get the InputStream.
-                    InputStream inputStream = urlConnection.getInputStream();
-
-                    // Create a buffered reader from that input stream.
-                    reader = new BufferedReader(new InputStreamReader(inputStream));
-
-                    // Use a StringBuilder to hold the incoming response.
-                    StringBuilder builder = new StringBuilder();
-
-                    if (urlConnection.getResponseCode() != 200) {
-                        initmdataBooks("");//处理得到的数据
-                        return;
-                    }
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        // Add the current line to the string.
-                        builder.append(line);
-
-                        // Since this is JSON, adding a newline isn't necessary (it won't
-                        // affect parsing) but it does make debugging a *lot* easier
-                        // if you print out the completed buffer for debugging.
-                        builder.append("\n");
-                    }
-
-                    if (builder.length() == 0) {
-                        // Stream was empty.  Exit without parsing.
-                        initmdataBooks("");//处理得到的数据
-                        return;
-                    }
-
-                    bookJSONString = builder.toString();
-
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    Log.d("请求google的json数据失败", bookJSONString);
-                } finally {
-                    // Close the connection and the buffered reader.
-                    if (urlConnection != null) {
-                        urlConnection.disconnect();
-                    }
-                    if (reader != null) {
-                        try {
-                            reader.close();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-                // Write the final JSON response to the log
-                Log.d("请求得到的json数据", bookJSONString);
-                initmdataBooksFromGoogle(bookJSONString);
-            }
-        }).start();
+    public void getURLResourceFromGoogle(String ulrDest) {
+        //检查网络状态
+        ConnectivityManager connMgr = (ConnectivityManager)
+                getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = null;
+        if (connMgr != null) {
+            networkInfo = connMgr.getActiveNetworkInfo();
+        }
+        //如果有网络连接执行异步任务
+        if (networkInfo != null) {
+            Bundle queryBundle = new Bundle();
+            queryBundle.putString("requestUrl", ulrDest);
+            LoaderManager.getInstance(this).restartLoader(0, queryBundle, this);
+        }
     }
 
+    //解析从google api获取出来的数据
     private void initmdataBooksFromGoogle(String jsonString) {
-
         // for testing purpos I'm creating a random set of books
         // you may get your data from web service or firebase database.
 
         mdata = new ArrayList<>();
-//        mdata.add(new Book("我的心中每天开出一朵花", "暂无描述", "幾米",
-//                "https://img9.doubanio.com/view/subject/l/public/s1150266.jpg",
-//                0, 80, (float)4.0));
-        //对返回的json数据解析，构建book对象
+
         try {
             String id = "", title = "", description= "", author = "", imgUrl = "";
             int pages = 0;
@@ -275,9 +221,7 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
                 mdata.add(new Book(title, description, author, imgUrl, pages, id, rating));
             }
         } catch (JSONException e) {
-            Looper.prepare();
             Toast.makeText(MainActivity.this, "获取谷歌图书失败", Toast.LENGTH_SHORT).show();
-            Looper.loop();
         }
     }
 
@@ -288,12 +232,7 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
             public void OnSearchClick(String keyword) {
                 //这里处理逻辑
                 getURLResourceFromGoogle("https://www.googleapis.com/books/v1/volumes?q=" + keyword);
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                setupBookAdapter();
+                Toast.makeText(MainActivity.this, "正在努力搜索中~", Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -384,15 +323,9 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
         }).start();
     }
 
+    //从豆瓣图书api获取图书数据
     private void initmdataBooks(String jsonString) {
-
-        // for testing purpos I'm creating a random set of books
-        // you may get your data from web service or firebase database.
-
         mdata = new ArrayList<>();
-//        mdata.add(new Book("我的心中每天开出一朵花", "暂无描述", "幾米",
-//                "https://img9.doubanio.com/view/subject/l/public/s1150266.jpg",
-//                0, 80, (float)4.0));
         //对返回的json数据解析，构建book对象
         try {
             String id = "", title = "", description= "", author = "", imgUrl = "";
@@ -521,4 +454,30 @@ public class MainActivity extends AppCompatActivity implements BookCallback {
             startActivity(intent);
     }
 
+    @NonNull
+    @Override
+    public Loader<String> onCreateLoader(int id, @Nullable Bundle args) {
+        String requestUrl = "";
+        if (args != null) {
+            requestUrl = args.getString("requestUrl");
+            Log.d("google搜索的网址：", requestUrl);
+        }
+        return new BookLoader(this, "GET", requestUrl, null);
+    }
+
+    @Override
+    public void onLoadFinished(@NonNull Loader<String> loader, String data) {
+        if (data != null) {
+            Log.d("google搜索结果：", data);
+            initmdataBooksFromGoogle(data);
+            setupBookAdapter();
+        } else {
+            Toast.makeText(this, "Google搜索图书失败", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    public void onLoaderReset(@NonNull Loader<String> loader) {
+
+    }
 }

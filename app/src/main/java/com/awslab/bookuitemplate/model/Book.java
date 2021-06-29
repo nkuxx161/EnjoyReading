@@ -37,12 +37,24 @@ public class Book implements Serializable {
         this.isFav = "no";
     }
 
+    public Book(String title, String description, String author, String imgUrl, int pages, String review, float rating, String isFav) {
+        this.title = title;
+        this.description = description;
+        this.author = author;
+        this.imgUrl = imgUrl;
+        this.pages = pages;
+        this.review = review;
+        this.rating = rating;
+        this.drawableResource = 0; //测试用
+        this.isFav = isFav;
+    }
+
 
     public String getIsFav() {
         return isFav;
     }
 
-    public void setIsFav(String title) {
+    public void setIsFav(String isFav) {
         this.isFav = isFav;
     }
 

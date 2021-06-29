@@ -1,8 +1,17 @@
 package com.awslab.bookuitemplate;
 
+import android.annotation.SuppressLint;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.loader.app.LoaderManager;
+import androidx.loader.content.Loader;
 import androidx.recyclerview.widget.RecyclerView;
 
 import androidx.core.app.ActivityOptionsCompat;
@@ -10,12 +19,17 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 
 import android.content.Intent;
 import android.os.Build;
+import android.os.Looper;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.RatingBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.awslab.bookuitemplate.NetworkUtils.BookLoader;
+import com.awslab.bookuitemplate.NetworkUtils.NetworkRequest;
 import com.awslab.bookuitemplate.model.Book;
 import com.awslab.bookuitemplate.recyclerview.BookAdapter;
 import com.awslab.bookuitemplate.recyclerview.BookCallback;
@@ -27,8 +41,20 @@ import java.util.List;
 // make sure to import this exact same class
 import androidx.core.util.Pair;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
-public class AdminFavlistActivity extends AppCompatActivity implements BookCallback {
+import static java.lang.Float.parseFloat;
+import static java.lang.Integer.parseInt;
+
+
+public class AdminFavlistActivity extends AppCompatActivity implements BookCallback, LoaderManager.LoaderCallbacks<String> {
+    public static final String LOG_TAG = "AdminFavlistActivity";
+
+    private String phone;
+    private String serverUrl = "https://hello-cloudbase-3gcqukj9c27892d6-1305327820.ap-shanghai.service.tcloudbase.com/api/v1.0/book-collection"; //服务器收藏集合地址
+    public JSONObject requestBody; //消息体
     private RecyclerView rvBooks;
     private BookAdapter bookAdapter;
     private List<Book> mdata;
@@ -43,7 +69,7 @@ public class AdminFavlistActivity extends AppCompatActivity implements BookCallb
 
         initmdataBooks();
 
-        setupBookAdapter();
+//        setupBookAdapter();
 
     }
 
@@ -55,18 +81,27 @@ public class AdminFavlistActivity extends AppCompatActivity implements BookCallb
     }
 
     private void initmdataBooks() {
+        //采用异步加载，从数据库得到收藏的书籍信息
 
-        // for testing purpos I'm creating a random set of books
-        // you may get your data from web service or firebase database.
-
-        mdata = new ArrayList<>();
-        mdata.add(new Book("http://books.google.com/books/content?id=e1NgBK4k2cwC&printsec=frontcover&img=1&zoom=5&edge=curl&source=gbs_api"));
-
-
+        //检查网络状态
+        ConnectivityManager connMgr = (ConnectivityManager)
+                getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = null;
+        if (connMgr != null) {
+            networkInfo = connMgr.getActiveNetworkInfo();
+        }
+        //如果有网络连接执行异步任务
+        if (networkInfo != null) {
+            LoaderManager.getInstance(this).restartLoader(0, null, this);
+            goMain.setText("数据加载中...");
+        }
 
     }
 
+    //完成页面的一些静态设置
     private void initViews() {
+        SharedPreferences preferences = getSharedPreferences("user", Context.MODE_PRIVATE);
+        phone = preferences.getString("userPhone",null);
         goMain = findViewById(R.id.btn_return);
         rvBooks = findViewById(R.id.rv_book);
 
@@ -83,9 +118,12 @@ public class AdminFavlistActivity extends AppCompatActivity implements BookCallb
         // we need first to setupe the custom item animator that we just create
         rvBooks.setItemAnimator(new CustomItemAnimator());
 
-        // to test the animation we need to simulate the add book operation
+        if (LoaderManager.getInstance(this).getLoader(0) != null) {
+            LoaderManager.getInstance(this).initLoader(0, null, this);
+        }
     }
 
+    //点击卡片进入书籍详情信息界面
     @Override
     public void onBookItemClick(int pos,
                                 ImageView imgContainer,
@@ -125,11 +163,65 @@ public class AdminFavlistActivity extends AppCompatActivity implements BookCallb
         else
             startActivity(intent);
 
+    }
+
+    //异步任务的加载处理
+    @NonNull
+    @Override
+    public Loader<String> onCreateLoader(int id, @Nullable Bundle args) {
+        JSONObject query = new JSONObject();
+        try {
+            requestBody = new JSONObject();
+            query.put("phone", phone);
+            requestBody.put("query", query);
+            Log.d(LOG_TAG, String.valueOf(requestBody));
+        } catch (JSONException e) {
+            e.printStackTrace();
+            Log.d(LOG_TAG, "构建请求体失败");
+        }
+        return new BookLoader(this, "POST", serverUrl+"/find", requestBody);
+    }
+
+    @SuppressLint("LongLogTag")
+    @Override
+    public void onLoadFinished(@NonNull Loader<String> loader, String data) {
+        mdata = new ArrayList<>();;
+        goMain.setText("返回主页");
+        try {
+            Log.d(LOG_TAG+"异步加载的数据", data);
+        } catch (Exception e) {
+            Log.d(LOG_TAG+"异步加载的数据", "获取的收藏信息为空");
+        }
+        //对返回的json数据解析，构建book对象
+        try {
+            String id = "", title = "", description = "", author = "", imgUrl = "";
+            int pages = 0;
+            float rating = 0;
+            JSONObject jsonData = new JSONObject(data);
+            JSONArray bookArray = jsonData.getJSONArray("data");
+            if (bookArray.length() == 0) {
+                Toast.makeText(this, "您还没有收藏，快去主页看看吧~", Toast.LENGTH_SHORT).show();
+            }
+            for (int i = 0; i < bookArray.length(); i++) {
+                JSONObject book = bookArray.getJSONObject(i);
+                title = book.getString("bookName");
+                description = book.getString("description");
+                author = book.getString("bookAuthor");
+                imgUrl = book.getString("bookImg");
+                pages = parseInt(book.getString("bookPages"));;//暂时获取不到
+                id = book.getString("bookId");
+                rating = parseFloat(book.getString("bookReview"));
+                mdata.add(new Book(title, description, author, imgUrl, pages, id, rating, "yes"));
+            }
+            setupBookAdapter();
+        }  catch (JSONException e) {
+            Toast.makeText(this, "获取个人收藏图书失败", Toast.LENGTH_SHORT).show();
+        }
 
     }
 
-    public void goMainActivity(View view) {
+    @Override
+    public void onLoaderReset(@NonNull Loader<String> loader) {
 
     }
-
 }
